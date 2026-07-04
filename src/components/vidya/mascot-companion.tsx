@@ -5,8 +5,94 @@ import { useLiveStats } from "@/lib/live-data";
 import { speakText, isTtsSupported } from "@/lib/voice-engine";
 import { useLang } from "@/lib/lang-context";
 import { Button } from "@/components/ui/button";
+import type { LangCode } from "@/lib/i18n";
 
 export type MascotExpression = "idle" | "happy" | "sad" | "thinking" | "speaking";
+
+const LOCALIZED_GREETINGS: Record<LangCode, (streak: number, cadet: boolean) => string> = {
+  en: (streak, cadet) => `Hi ${cadet ? "Space Cadet " : ""}Aarav! You have a ${streak}-day streak! 🔥 Let's play a game together!`,
+  hi: (streak, cadet) => `नमस्ते ${cadet ? "अंतरिक्ष यात्री " : ""}आरव! तुम्हारी ${streak} दिनों की सीखने की लकीर है! 🔥 चलो मिलकर एक खेल खेलते हैं!`,
+  mr: (streak, cadet) => `नमस्कार ${cadet ? "अंतराळवीर " : ""}आरव! तुझी ${streak} दिवसांची अभ्यासाची मालिका आहे! 🔥 चला सोबत मिळून एक खेळ खेळूया!`,
+  gu: (streak, cadet) => `નમસ્તે ${cadet ? "અંતરિક્ષ યાત્રી " : ""}આરવ! તારી ${streak} દિવસની ધારો છે! 🔥 ચાલો સાથે મળીને એક રમત રમીએ!`,
+  ta: (streak, cadet) => `வணக்கம் ${cadet ? "விண்வெளி வீரர் " : ""}ஆரவ்! உனக்கு ${streak} நாட்கள் தொடர் சாதனை உள்ளது! 🔥 வா ஒரு விளையாட்டு விளையாடுவோம்!`,
+  kn: (streak, cadet) => `ನಮಸ್ತೆ ${cadet ? "ಗಗನಯಾತ್ರಿ " : ""}ಆರವ್! ನಿನಗೆ ${streak} ದಿನಗಳ ಯಶಸ್ವಿ ಸರಣಿ ಇದೆ! 🔥 ಬನ್ನಿ ಜೊತೆಯಾಗಿ ಆಟವಾಡೋಣ!`,
+  te: (streak, cadet) => `ನಮಸ್ತೆ ${cadet ? "ಅಂತರಿಕ್ಷ ಯಾತ್ರಿಕ " : ""}ಆರವ್! ನಿನಗೆ ${streak} ದಿನಗಳ ಸತತ ಗೆಲುವಿನ ಲೈನ್ ಇದೆ! 🔥 ಬನ್ನಿ ಒಟ್ಟಿಗೆ ಆಟವಾಡೋಣ!`,
+};
+
+const LOCALIZED_CELEBRATIONS: Record<LangCode, string> = {
+  en: "Woohoo! Awesome job, Aarav! You got it right! ⭐",
+  hi: "अरे वाह! बहुत बढ़िया आरव! तुम्हारा जवाब बिल्कुल सही है! ⭐",
+  mr: "शाब्बास! खूपच छान आरव! तुझे उत्तर अगदी बरोबर आहे! ⭐",
+  gu: "વાહ! ખૂબ જ સરસ આરવ! તારો જવાબ સાચો છે! ⭐",
+  ta: "சூப்பர்! அருமை ஆரவ்! நீ சரியாக விடையளித்தாய்! ⭐",
+  kn: "ಅದ್ಭುತ! ತುಂಬಾ ಚೆನ್ನಾಗಿದೆ ಆರವ್! ನಿನ್ನ ಉತ್ತರ ಸರಿಯಾಗಿದೆ! ⭐",
+  te: "భలే చెప్పావు! చాలా బాగా చేసావు ఆరవ్! నీ సమాధానం సరైనది! ⭐",
+};
+
+const LOCALIZED_COMFORTS: Record<LangCode, string> = {
+  en: "That's okay, Aarav! Mistakes help us learn. Try again! ❤️",
+  hi: "कोई बात नहीं आरव! गलतियों से ही हम सीखते हैं। फिर से कोशिश करो! ❤️",
+  mr: "काही हरकत नाही आरव! चुकांमधूनच आपण शिकतो। पुन्हा प्रयत्न कर! ❤️",
+  gu: "કાંઈ વાંધો નહીં આરવ! ભૂલોથી જ આપણે શીખીએ છીએ. ફરી પ્રયાસ કર! ❤️",
+  ta: "பரவாயில்லை ஆரவ்! தவறுகள் நமக்கு கற்றுக்கொடுக்கும். மீண்டும் முயற்சி செய்! ❤️",
+  kn: "ಪರವಾಗಿಲ್ಲ ಆರವ್! ತಪ್ಪುಗಳಿಂದಲೇ ನಾವು ಕಲಿಯುವುದು. ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸು! ❤️",
+  te: "పర్వాలేదు ఆరవ్! తప్పుల నుండే మనం నేర్చుకుంటాము. మళ్లీ ప్రయత్నించు! ❤️",
+};
+
+const LOCALIZED_HINT_PREFIXES: Record<LangCode, (hint: string) => string> = {
+  en: (hint) => `Here is a little clue: ${hint} 🤔`,
+  hi: (hint) => `यहाँ तुम्हारे लिए एक छोटा संकेत है: ${hint} 🤔`,
+  mr: (hint) => `येथे तुझ्यासाठी एक छोटा संकेत आहे: ${hint} 🤔`,
+  gu: (hint) => `અહીં તારા માટે એક નાનું સૂચન છે: ${hint} 🤔`,
+  ta: (hint) => `உனக்காக ஒரு சிறிய குறிப்பு: ${hint} 🤔`,
+  kn: (hint) => `ನಿನಗಾಗಿ ಒಂದು ಸಣ್ಣ ಸುಳಿವು ಇಲ್ಲಿದೆ: ${hint} 🤔`,
+  te: (hint) => `నీ కోసం ఒక చిన్న క్లూ ఇక్కడ ఉంది: ${hint} 🤔`,
+};
+
+const LOCALIZED_PROMPTS: Record<LangCode, (collectiblesCount: number, xp: number) => string[]> = {
+  en: (col, xp) => [
+    `Hey Aarav! We have unlocked the ${col} collectibles in our Room! Let's check them out.`,
+    `Your current score is ${xp} XP. Let's aim for even higher! 🚀`,
+    `Would you like to play Story Castle or count numbers today? Let's count! 🐸`,
+    `Remember, if you ever feel tired, we can take a stretch break together! 🙆‍♂️`
+  ],
+  hi: (col, xp) => [
+    `नमस्ते आरव! हमने अपने कमरे में ${col} खिलौने अनलॉक कर लिए हैं! चलो उन्हें देखें।`,
+    `तुम्हारा स्कोर ${xp} XP है। चलो इसे और बढ़ाते हैं! 🚀`,
+    `आज तुम कहानी महल खेलोगे या संख्या जंगल में गिनना चाहोगे? चलो गिनते हैं! 🐸`,
+    `याद रखो आरव, अगर तुम थक जाओ तो हम मिलकर थोड़ा आराम कर सकते हैं! 🙆‍♂️`
+  ],
+  mr: (col, xp) => [
+    `आरव! आपण आपल्या खोलीत ${col} खेळणी उघडली आहेत! चला ती पाहूया।`,
+    `तुझा गुण ${xp} XP आहे। चला आणखी वाढवूया! 🚀`,
+    `आज तुला गोष्ट वाचायला आवडेल की मोजायला? चला मोजूया! 🐸`,
+    `लक्षात ठेव आरव, थकल्यासारखे वाटले तर आपण थोडी विश्रांती घेऊ शकतो! 🙆‍♂️`
+  ],
+  gu: (col, xp) => [
+    `હે આરવ! આપણે ઓરડામાં ${col} રમકડાં અનલૉક કર્યાં છે! ચાલો તેને જોઈએ.`,
+    `તારો સ્કોર ${xp} XP છે. ચાલો તેને હજુ વધારીએ! 🚀`,
+    `આજે તારે વાર્તા રમવી છે કે સંખ્યા જંગલમાં ગણતरी કરવી છે? ચાલો ગણીએ! 🐸`,
+    `યાદ રાખજે આરવ, જો તું થાકી જાય તો આપણે થોડો આરામ કરી શકીએ છીએ! 🙆‍♂️`
+  ],
+  ta: (col, xp) => [
+    `ஹே ஆரவ்! நமது அறையில் ${col} பொம்மைகளைத் திறந்துள்ளோம்! வா பார்க்கலாம்.`,
+    `உன் மதிப்பெண் ${xp} XP. அதை இன்னும் அதிகமாக்குவோம்! 🚀`,
+    `இன்று கதை மாளிகை விளையாடலாமா அல்லது எண்களை எண்ணலாமா? வா எண்ணுவோம்! 🐸`,
+    `நினைவிருக்கட்டும் ஆரவ், களைப்பாக இருந்தால் நாம் சிறிது ஓய்வு எடுத்துக்கொள்ளலாம்! 🙆‍♂️`
+  ],
+  kn: (col, xp) => [
+    `ಹೇ ಆರವ್! ನಾವು ಕೋಣೆಯಲ್ಲಿ ${col} ಆಟಿಕೆಗಳನ್ನು ಅನ್ಲಾಕ್ ಮಾಡಿದ್ದೇವೆ! ಬನ್ನಿ ನೋಡೋಣ.`,
+    `ನಿನ್ನ ಅಂಕಗಳು ${xp} XP. ಇನ್ನು ಹೆಚ್ಚು ಮಾಡೋಣ! 🚀`,
+    `ಇಂದು ಕಥೆ ಓದುತ್ತೀಯಾ ಅಥವಾ ಎಣಿಕೆ ಮಾಡುತ್ತೀಯಾ? ಬನ್ನಿ ಎಣಿಸೋಣ! 🐸`,
+    `ನೆನಪಿಡಿ ಆರವ್, ದಣಿವಾದರೆ ನಾವು ಸ್ವಲ್ಪ ವಿಶ್ರಾಂತಿ ತೆಗೆದುಕೊಳ್ಳಬಹುದು! 🙆‍♂️`
+  ],
+  te: (col, xp) => [
+    `ఆరవ్! మనం రూములో ${col} ఆటవస్తువులను అన్లాక్ చేశాము! పద చూద్దాం.`,
+    `నీ స్కోరు ${xp} XP. దాన్ని మరింత పెంచుదాం! 🚀`,
+    `ఈరోజు కథ చదువుతావా లేక లెక్కలు వేస్తాवा? పద లెక్కిద్దాం! 🐸`,
+    `గుర్తుంచుకో ఆరవ్, అలసిపోతే మనం కాసేపు విశ్రాంతి తీసుకుందాం! 🙆‍♂️`
+  ]
+};
 
 // Global custom triggers so games can cause reactions
 declare global {
@@ -26,29 +112,36 @@ export function MascotCompanion() {
   const [isVisible, setIsVisible] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Auto-greeting on mount
+  // Auto-greeting on mount or language changes
   useEffect(() => {
+    const greetingTemp = LOCALIZED_GREETINGS[lang as LangCode] || LOCALIZED_GREETINGS.en;
+    const isCadet = stats.selectedCollectibleTheme !== "default";
+    const greeting = greetingTemp(stats.streakDays, isCadet);
+    
     const timer = setTimeout(() => {
-      const greeting = `Hi ${stats.selectedCollectibleTheme !== "default" ? "Space Cadet" : ""} Aarav! You have a ${stats.streakDays}-day streak! 🔥 Let's play a game together!`;
       say(greeting, "happy");
     }, 1500);
+    
     return () => clearTimeout(timer);
-  }, []);
+  }, [lang]);
 
   // Set up global listeners so games can hook in
   useEffect(() => {
     window.triggerMascotCelebrate = (customText?: string) => {
-      const text = customText || "Woohoo! Awesome job, Aarav! You got it right! ⭐";
+      const celebrateText = LOCALIZED_CELEBRATIONS[lang as LangCode] || LOCALIZED_CELEBRATIONS.en;
+      const text = customText || celebrateText;
       say(text, "happy");
     };
 
     window.triggerMascotComfort = (customText?: string) => {
-      const text = customText || "That's okay, Aarav! Mistakes help us learn. Try again! ❤️";
+      const comfortText = LOCALIZED_COMFORTS[lang as LangCode] || LOCALIZED_COMFORTS.en;
+      const text = customText || comfortText;
       say(text, "sad");
     };
 
     window.triggerMascotHint = (hintText: string) => {
-      say(`Here is a little clue: ${hintText} 🤔`, "thinking");
+      const hintTemp = LOCALIZED_HINT_PREFIXES[lang as LangCode] || LOCALIZED_HINT_PREFIXES.en;
+      say(hintTemp(hintText), "thinking");
     };
 
     window.triggerMascotSpeak = (text: string) => {
@@ -68,7 +161,7 @@ export function MascotCompanion() {
     setBubbleText(text);
     
     if (!isMuted && isTtsSupported()) {
-      speakText(text, lang, () => {
+      speakText(text, lang as LangCode, () => {
         setExpression("idle");
       });
     } else {
@@ -79,13 +172,8 @@ export function MascotCompanion() {
   };
 
   const handleMascotClick = () => {
-    // Generate helpful custom hints/conversations based on status
-    const prompts = [
-      `Hey Aarav! We have unlocked the ${stats.collectibles.length} collectibles in our Room! Let's check them out.`,
-      `Your current score is ${stats.xp} XP. Let's aim for 2000! 🚀`,
-      `Would you like to play Story Castle or count numbers today? Let's count! 🐸`,
-      `Remember, if you ever feel tired, we can take a stretch break together! 🙆‍♂️`
-    ];
+    const poolTemp = LOCALIZED_PROMPTS[lang as LangCode] || LOCALIZED_PROMPTS.en;
+    const prompts = poolTemp(stats.collectibles.length, stats.xp);
     const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
     say(randomPrompt, "happy");
   };

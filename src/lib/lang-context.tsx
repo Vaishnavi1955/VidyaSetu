@@ -20,6 +20,13 @@ export const LangContext = createContext<LangContextValue>({
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<LangCode>(() => {
     try {
+      const storedStats = localStorage.getItem("vs_live_stats");
+      if (storedStats) {
+        const statsObj = JSON.parse(storedStats);
+        if (statsObj.languageCode) {
+          return statsObj.languageCode as LangCode;
+        }
+      }
       return (localStorage.getItem("vs_lang") as LangCode) || "en";
     } catch {
       return "en";
@@ -28,7 +35,15 @@ export function LangProvider({ children }: { children: ReactNode }) {
 
   const setLang = (l: LangCode) => {
     setLangState(l);
-    try { localStorage.setItem("vs_lang", l); } catch {}
+    try {
+      localStorage.setItem("vs_lang", l);
+      const storedStats = localStorage.getItem("vs_live_stats");
+      if (storedStats) {
+        const statsObj = JSON.parse(storedStats);
+        statsObj.languageCode = l;
+        localStorage.setItem("vs_live_stats", JSON.stringify(statsObj));
+      }
+    } catch {}
   };
 
   const tFn = (key: keyof Translations) => translate(lang, key);

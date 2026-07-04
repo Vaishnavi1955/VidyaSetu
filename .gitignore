@@ -34,3 +34,5 @@ dist-ssr
 # Duplicate folders
 vidya-setu-ss/
 
+
+.vercel

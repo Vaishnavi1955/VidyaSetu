@@ -1,5 +1,5 @@
 // Shape Sort Game — click the correct shape name or match shape to outline
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Confetti } from "@/components/vidya/confetti";
 import { useLang } from "@/lib/lang-context";
@@ -12,9 +12,7 @@ const SHAPES: { emoji: string; svg: string; names: Record<LangCode, string>; sid
   { emoji: "⬜", svg: "square", names: { en: "Square", hi: "वर्ग", mr: "चौरस", gu: "ચોરસ", ta: "சதுரம்", te: "చతురస్రం", kn: "ಚೌಕ" }, sides: 4, color: "bg-blue-400" },
   { emoji: "🟩", svg: "rectangle", names: { en: "Rectangle", hi: "आयत", mr: "आयत", gu: "લંબચોરસ", ta: "செவ்வகம்", te: "దీర్ఘచతురస్రం", kn: "ಆಯತ" }, sides: 4, color: "bg-green-400" },
   { emoji: "⭐", svg: "star", names: { en: "Star", hi: "तारा", mr: "तारा", gu: "તારો", ta: "நட்சத்திரம்", te: "నక్షత్రం", kn: "ನಕ್ಷತ್ರ" }, sides: 5, color: "bg-yellow-400" },
-  { emoji: "💎", svg: "diamond", names: { en: "Diamond", hi: "हीरा", mr: "हिरा", gu: "હીરો", ta: "வைரம்", te: "వజ్రం", kn: "ವಜ್ರ" }, sides: 4, color: "bg-purple-400" },
-  { emoji: "⬡", svg: "hexagon", names: { en: "Hexagon", hi: "षट्भुज", mr: "षटकोन", gu: "ષટ્કોણ", ta: "அறுகோணம்", te: "షడ్భుజి", kn: "ಷಡ್ಭುಜ" }, sides: 6, color: "bg-pink-400" },
-  { emoji: "🌙", svg: "crescent", names: { en: "Crescent", hi: "अर्धचंद्र", mr: "चंद्रकोर", gu: "અર્ધચંદ્ર", ta: "பிறை", te: "చంద్రవంక", kn: "ಚಂದ್ರಕಲೆ" }, sides: 0, color: "bg-slate-400" },
+  { emoji: "💎", svg: "diamond", names: { en: "Diamond", hi: "हीरा", mr: "हिरा", gu: "હીરો", ta: "வைரம்", te: "வజ్రం", kn: "ವಜ್ರ" }, sides: 4, color: "bg-purple-400" },
 ];
 
 const SVG_SHAPES: Record<string, React.FC<{ className?: string }>> = {
@@ -24,8 +22,26 @@ const SVG_SHAPES: Record<string, React.FC<{ className?: string }>> = {
   rectangle: ({ className }) => <svg viewBox="0 0 100 60" className={className}><rect x="5" y="5" width="90" height="50" /></svg>,
   star: ({ className }) => <svg viewBox="0 0 100 100" className={className}><polygon points="50,5 61,35 95,35 68,57 79,91 50,70 21,91 32,57 5,35 39,35" /></svg>,
   diamond: ({ className }) => <svg viewBox="0 0 100 100" className={className}><polygon points="50,5 95,50 50,95 5,50" /></svg>,
-  hexagon: ({ className }) => <svg viewBox="0 0 100 100" className={className}><polygon points="50,5 90,27 90,73 50,95 10,73 10,27" /></svg>,
-  crescent: ({ className }) => <svg viewBox="0 0 100 100" className={className}><path d="M65 15 A40 40 0 1 0 65 85 A30 30 0 1 1 65 15Z" /></svg>,
+};
+
+const LOCALIZED_SHAPE_SUCCESS: Record<LangCode, (name: string, sides: number) => string> = {
+  en: (name, sides) => `Correct! A ${name} has ${sides === 0 ? "no" : sides} sides!`,
+  hi: (name, sides) => `सही! एक ${name} की ${sides === 0 ? "कोई भुजा नहीं" : sides + " भुजाएं"} होती हैं!`,
+  mr: (name, sides) => `बरोबर! एका ${name} ला ${sides === 0 ? "एकही बाजू नसते" : sides + " बाजू असतात"}!`,
+  gu: (name, sides) => `સાચું! એક ${name} ને ${sides === 0 ? "કોઈ બાજુ હોતી નથી" : sides + " બાજુઓ"} હોય છે!`,
+  ta: (name, sides) => `சரி! ஒரு ${name} பக்கங்களுக்கு ${sides === 0 ? "பக்கங்கள் இல்லை" : sides + " பக்கங்கள் உள்ளன"}!`,
+  kn: (name, sides) => `ಸರಿ! ಒಂದು ${name} ಗೆ ${sides === 0 ? "ಯಾವುದೇ ಬದಿಗಳಿಲ್ಲ" : sides + " ಬದಿಗಳಿವೆ"}!`,
+  te: (name, sides) => `సరైనది! ఒక ${name} కి ${sides === 0 ? "భుజాలు లేవు" : sides + " భుజాలు ఉన్నాయి"}!`,
+};
+
+const LOCALIZED_SHAPE_FAILURE: Record<LangCode, (name: string, sides: number) => string> = {
+  en: (name, sides) => `Try again! A ${name} has ${sides === 0 ? "curved edges" : sides + " sides"}!`,
+  hi: (name, sides) => `फिर कोशिश करो! एक ${name} की ${sides === 0 ? "घुमावदार किनारे" : sides + " भुजाएं"} होती हैं!`,
+  mr: (name, sides) => `पुन्हा प्रयत्न करा! एका ${name} ला ${sides === 0 ? "वक्र कडा" : sides + " बाजू"} असतात!`,
+  gu: (name, sides) => `ફરીપ્રયાસ કરો! એક ${name} ને ${sides === 0 ? "વળાંકવાળી કિનારીઓ" : sides + " બાજુઓ"} હોય છે!`,
+  ta: (name, sides) => `மீண்டும் முயற்சி செய்க! ஒரு ${name} பக்கங்களுக்கு ${sides === 0 ? "வளைந்த விளிம்புகள்" : sides + " பக்கங்கள் உள்ளன"}!`,
+  kn: (name, sides) => `ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ! ಒಂದು ${name} ಗೆ ${sides === 0 ? "ಬಾಗಿದ ಅಂಚುಗಳು" : sides + " ಬದಿಗಳಿವೆ"}!`,
+  te: (name, sides) => `మళ్ళీ ప్రయత్నించండి! ఒక ${name} కి ${sides === 0 ? "వంగిన అంచులు" : sides + " భుజాలు ఉన్నాయి"}!`,
 };
 
 function shuffle<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random() - 0.5); }
@@ -58,6 +74,18 @@ export function ShapeSort({ onComplete }: ShapeSortProps) {
   const [showConfetti, setShowConfetti] = useState(false);
   const TARGET = 5;
 
+  // Restart/reset game when language shifts
+  useEffect(() => {
+    const pool = shuffle(SHAPES);
+    setQuestion({ correct: pool[0], options: shuffle(pool.slice(0, 4)) });
+    setSelected(null);
+    setIsCorrect(null);
+    setScore(0);
+    setTotal(0);
+    setFeedback("");
+    setFinished(false);
+  }, [lang]);
+
   const handleAnswer = useCallback((shapeSvg: string) => {
     if (selected) return;
     setSelected(shapeSvg);
@@ -67,9 +95,12 @@ export function ShapeSort({ onComplete }: ShapeSortProps) {
     if (correct) setScore(s => s + 1);
 
     const shapeName = question.correct.names[lang as LangCode];
+    const successTemp = LOCALIZED_SHAPE_SUCCESS[lang as LangCode] || LOCALIZED_SHAPE_SUCCESS.en;
+    const failTemp = LOCALIZED_SHAPE_FAILURE[lang as LangCode] || LOCALIZED_SHAPE_FAILURE.en;
+
     setFeedback(correct
-      ? `${t("correctAnswer")} A ${shapeName} has ${question.correct.sides === 0 ? "no" : question.correct.sides} sides!`
-      : `${t("wrongAnswer")} That was not a ${shapeName}. A ${shapeName} has ${question.correct.sides === 0 ? "curved edges" : question.correct.sides + " sides"}!`
+      ? successTemp(shapeName, question.correct.sides)
+      : failTemp(shapeName, question.correct.sides)
     );
 
     setTimeout(() => {
@@ -89,105 +120,67 @@ export function ShapeSort({ onComplete }: ShapeSortProps) {
         setIsCorrect(null);
         setFeedback("");
       }
-    }, 1200);
-  }, [selected, question, total, score, lang, t, onComplete]);
+    }, 1500);
+  }, [selected, question, total, score, lang, onComplete]);
 
   const finalScore = score;
-  const finalStars = finalScore >= TARGET - 1 ? 3 : finalScore >= Math.floor(TARGET * 0.6) ? 2 : 1;
   const CorrectSVG = SVG_SHAPES[question.correct.svg];
 
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div className="flex flex-col items-center gap-5 w-full">
       <Confetti active={showConfetti} />
 
-      <div className="flex w-full items-center justify-between text-sm font-bold">
-        <span>🔺 {t("score")}: {score}/{total}</span>
-        <span>Q {Math.min(total + 1, TARGET)}/{TARGET}</span>
-      </div>
-
       {!finished ? (
-        <>
-          {/* Show shape, ask name */}
-          <motion.div
-            key={question.correct.svg}
-            initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            className="flex flex-col items-center gap-3 rounded-3xl bg-muted/50 p-8"
-          >
-            <p className="text-sm font-bold text-muted-foreground">{t("sortShapes")}</p>
-            <div className={`rounded-2xl p-4 ${question.correct.color} shadow-glow`}>
-              {CorrectSVG && <CorrectSVG className="h-24 w-24 fill-white" />}
-            </div>
-            <p className="text-sm text-muted-foreground">What shape is this?</p>
-          </motion.div>
-
-          {/* Shape name options */}
-          <div className="grid w-full grid-cols-2 gap-3">
-            {question.options.map(opt => {
-              const isThis = selected === opt.svg;
-              const isCorrectOpt = opt.svg === question.correct.svg;
-              return (
-                <motion.button
-                  key={opt.svg}
-                  whileHover={{ scale: selected ? 1 : 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => handleAnswer(opt.svg)}
-                  disabled={!!selected}
-                  className={`flex items-center gap-3 rounded-2xl border-2 p-3 text-left font-bold transition-all ${
-                    selected
-                      ? isCorrectOpt
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                        : isThis
-                        ? "border-red-400 bg-red-50 text-red-600"
-                        : "border-border opacity-40"
-                      : "border-border bg-card hover:border-primary cursor-pointer"
-                  }`}
-                >
-                  <span className="text-2xl">{opt.emoji}</span>
-                  <span>{opt.names[lang as LangCode]}</span>
-                </motion.button>
-              );
-            })}
+        <div className="w-full flex flex-col items-center gap-6">
+          {/* Phonics audio trigger instruction */}
+          <div className="w-full">
+            <VoiceTutorUi
+              expectedPhrase={question.correct.names[lang as LangCode]}
+              instructionText={`${t("sortShapes") || "Click the"} "${question.correct.names[lang as LangCode]}"`}
+              successText={t("correctAnswer")}
+              onSuccess={() => handleAnswer(question.correct.svg)}
+            />
           </div>
 
-          {/* Voice Tutor UI */}
-          <VoiceTutorUi
-            expectedAnswer={question.correct.names[lang as LangCode]}
-            instructionText={`What shape is this? Say the name of the shape!`}
-            onCorrect={() => handleAnswer(question.correct.svg)}
-            onIncorrect={() => {
-              setFeedback(`Try again! Can you say "${question.correct.names[lang as LangCode]}"?`);
-            }}
-            themeColor="bg-grad-yellow"
-          />
+          <div className="flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900 border rounded-3xl min-h-[140px] max-w-sm w-full shadow-soft">
+            <CorrectSVG className="h-24 w-24 fill-indigo-600 stroke-indigo-800 dark:fill-indigo-400 dark:stroke-indigo-300" />
+          </div>
 
-          <AnimatePresence>
-            {feedback && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className={`w-full rounded-2xl p-3 text-sm font-bold ${isCorrect ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+          <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+            {question.options.map(opt => (
+              <Button
+                key={opt.svg}
+                onClick={() => handleAnswer(opt.svg)}
+                variant="outline"
+                className={`h-16 rounded-2xl font-display text-base font-extrabold border-2 transition-all ${
+                  selected === opt.svg
+                    ? isCorrect
+                      ? "border-green-500 bg-green-50 text-green-700"
+                      : "border-red-500 bg-red-50 text-red-700"
+                    : "hover:scale-[1.03] hover:shadow-soft"
+                }`}
               >
-                🤖 {feedback}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
+                {opt.names[lang as LangCode]}
+              </Button>
+            ))}
+          </div>
+
+          {feedback && (
+            <div className={`p-4 rounded-2xl border text-xs font-bold leading-relaxed text-center max-w-sm ${
+              isCorrect ? "bg-green-50 text-green-800 border-green-200" : "bg-red-50 text-red-800 border-red-200"
+            }`}>
+              {feedback}
+            </div>
+          )}
+        </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full rounded-3xl bg-grad-purple p-6 text-center text-white shadow-glow"
-        >
-          <div className="text-5xl">{finalStars >= 3 ? "🏆" : "🔺"}</div>
-          <div className="mt-2 font-display text-2xl font-extrabold">{t("wellDone")}</div>
-          <div className="mt-1 text-xl">{"⭐".repeat(finalStars)}</div>
-          <div className="mt-2 text-sm opacity-90">{finalScore}/{TARGET} shapes identified!</div>
-          <p className="mt-3 rounded-2xl bg-white/20 p-3 text-left text-xs backdrop-blur">
-            🤖 Gemini AI: {finalScore >= TARGET - 1 ? "Excellent spatial awareness! Shape recognition supports early geometry and writing readiness." : "Shape recognition is developing well! Try sorting household objects by shape daily."}
+        <div className="rounded-3xl border bg-card p-6 shadow-card text-center space-y-4 w-full">
+          <span className="text-5xl">🏆🔺</span>
+          <h3 className="font-display font-extrabold text-2xl">{t("wellDone")}</h3>
+          <p className="text-sm text-muted-foreground">
+            Shape classification practice completed!
           </p>
-        </motion.div>
+        </div>
       )}
     </div>
   );

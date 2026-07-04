@@ -8,20 +8,43 @@ import { analyzeMemory } from "@/lib/ai-engine";
 import { useLang } from "@/lib/lang-context";
 import { speakText } from "@/lib/voice-engine";
 import { VoiceTutorUi } from "@/components/vidya/voice-tutor-ui";
+import type { LangCode } from "@/lib/i18n";
 
-const EMOJI_NAMES: Record<string, string> = {
-  "🐘": "Elephant", "🦁": "Lion", "🐒": "Monkey", "🦊": "Fox", "🐸": "Frog", "🦋": "Butterfly", "🐬": "Dolphin", "🦄": "Unicorn",
-  "🍎": "Apple", "🍌": "Banana", "🍓": "Strawberry", "🍊": "Orange", "🍇": "Grapes", "🍉": "Watermelon", "🍑": "Peach", "🥭": "Mango",
-  "🔵": "Blue", "🔴": "Red", "🟡": "Yellow", "🟢": "Green", "🟣": "Purple", "🟠": "Orange", "🟤": "Brown", "⚪": "White",
-  "🚀": "Rocket", "⭐": "Star", "🌙": "Moon", "☀️": "Sun", "🌈": "Rainbow", "⚡": "Lightning", "❄️": "Snowflake", "🔥": "Fire"
+const EMOJI_NAMES: Record<string, Record<LangCode, string>> = {
+  "🐘": { en: "Elephant", hi: "हाथी", mr: "हत्ती", gu: "હાથી", ta: "யானை", te: "ఏనుగు", kn: "ಆನೆ" },
+  "🦁": { en: "Lion", hi: "शेर", mr: "सिंह", gu: "સિંહ", ta: "சிங்கம்", te: "సింహం", kn: "ಸಿಂಹ" },
+  "🐒": { en: "Monkey", hi: "बंदर", mr: "माकड", gu: "વાંદરો", ta: "குரங்கு", te: "కోతి", kn: "ಕೋತಿ" },
+  "🦊": { en: "Fox", hi: "लोमड़ी", mr: "कोल्हा", gu: "શિયાળ", ta: "நரி", te: "నక్క", kn: "ನರಿ" },
+  "🍎": { en: "Apple", hi: "सेब", mr: "सफरचंद", gu: "સફરજન", ta: "ஆப்பிள்", te: "ఆపిల్", kn: "ಸೇಬು" },
+  "🍌": { en: "Banana", hi: "केला", mr: "केळे", gu: "કેળું", ta: "வாழைப்பழம்", te: "అరటిపండు", kn: "ಬಾಳೆಹಣ್ಣು" },
+  "🚀": { en: "Rocket", hi: "रॉकेट", mr: "रॉकेट", gu: "રોકેટ", ta: "ராக்கெட்", te: "రాకెట్", kn: "ರಾಕೆಟ್" },
+  "⭐": { en: "Star", hi: "तारा", mr: "तारा", gu: "તારો", ta: "நட்சத்திரம்", te: "నక్షత్రం", kn: "ನಕ್ಷತ್ರ" }
 };
 
 const CARD_SETS = [
-  ["🐘", "🦁", "🐒", "🦊", "🐸", "🦋", "🐬", "🦄"],
-  ["🍎", "🍌", "🍓", "🍊", "🍇", "🍉", "🍑", "🥭"],
-  ["🔵", "🔴", "🟡", "🟢", "🟣", "🟠", "🟤", "⚪"],
-  ["🚀", "⭐", "🌙", "☀️", "🌈", "⚡", "❄️", "🔥"],
+  ["🐘", "🦁", "🐒", "🦊"],
+  ["🍎", "🍌", "🚀", "⭐"],
 ];
+
+const LOCALIZED_INSTRUCTIONS: Record<LangCode, string> = {
+  en: "Tap cards to find matching pairs!",
+  hi: "जोड़े खोजने के लिए कार्ड पर टैप करें!",
+  mr: "जोड्या शोधण्यासाठी कार्डवर टॅप करा!",
+  gu: "જોડ શોધવા માટે કાર્ડ્સ પર ટૅપ કરો!",
+  ta: "பொருந்தும் ஜோடிகளைக் கண்டறிய கார்டுகளைத் தட்டவும்!",
+  kn: "ಹೊಂದುವ ಜೋಡಿಗಳನ್ನು ಹುಡುಕಲು ಕಾರ್ಡ್‌ಗಳನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ!",
+  te: "సరిపోలే జంటలను కనుగొనడానికి కార్డ్‌లను నొక్కండి!",
+};
+
+const LOCALIZED_MATCH_ANNOUNCEMENTS: Record<LangCode, (name: string) => string> = {
+  en: (name) => `Match! That is a ${name}`,
+  hi: (name) => `सही जोड़ा! यह एक ${name} है`,
+  mr: (name) => `योग्य जोडी! हा ${name} आहे`,
+  gu: (name) => `સાચી જોડ! આ એક ${name} છે`,
+  ta: (name) => `சரியான ஜோடி! இது ஒரு ${name}`,
+  kn: (name) => `ಸರಿಯಾದ ಜೋಡಿ! ಇದು ${name}`,
+  te: (name) => `సరైన జంట! ఇది ఒక ${name}`,
+};
 
 interface Card { id: number; emoji: string; flipped: boolean; matched: boolean; }
 
@@ -42,10 +65,12 @@ function buildDeck(set: string[]): Card[] {
 export function MemoryMatch({ onComplete }: MemoryMatchProps) {
   const { t, lang } = useLang();
   
-  // Initial instruction
+  // Initial instruction speaking reactive to language change
   useEffect(() => {
-    speakText("Tap cards to find matching pairs!", lang as any);
+    const text = LOCALIZED_INSTRUCTIONS[lang as LangCode] || LOCALIZED_INSTRUCTIONS.en;
+    speakText(text, lang as LangCode);
   }, [lang]);
+
   const [setIndex] = useState(() => Math.floor(Math.random() * CARD_SETS.length));
   const [cards, setCards] = useState<Card[]>(() => buildDeck(CARD_SETS[setIndex]));
   const [selected, setSelected] = useState<number[]>([]);
@@ -58,14 +83,12 @@ export function MemoryMatch({ onComplete }: MemoryMatchProps) {
 
   const totalPairs = CARD_SETS[setIndex].length;
 
-  // Timer
   useEffect(() => {
     if (won) return;
     const id = setInterval(() => setSeconds(s => s + 1), 1000);
     return () => clearInterval(id);
   }, [won]);
 
-  // Check for win
   useEffect(() => {
     if (pairsFound === totalPairs) {
       setWon(true);
@@ -96,108 +119,60 @@ export function MemoryMatch({ onComplete }: MemoryMatchProps) {
         if (ca.emoji === cb.emoji) {
           setCards(prev => prev.map(c => newSelected.includes(c.id) ? { ...c, matched: true } : c));
           setPairsFound(p => p + 1);
-          const name = EMOJI_NAMES[ca.emoji] || "Match";
-          speakText(`Match! That is a ${name}`, lang as any);
+          
+          const localizedNameMap = EMOJI_NAMES[ca.emoji] || { en: "Match" };
+          const name = localizedNameMap[lang as LangCode] || localizedNameMap.en;
+          const matchTemp = LOCALIZED_MATCH_ANNOUNCEMENTS[lang as LangCode] || LOCALIZED_MATCH_ANNOUNCEMENTS.en;
+          
+          speakText(matchTemp(name), lang as LangCode);
         } else {
           setCards(prev => prev.map(c => newSelected.includes(c.id) ? { ...c, flipped: false } : c));
         }
         setSelected([]);
         setIsChecking(false);
-      }, 700);
+      }, 1000);
     }
-  }, [cards, selected, isChecking]);
-
-  const restart = () => {
-    setCards(buildDeck(CARD_SETS[setIndex]));
-    setSelected([]);
-    setAttempts(0);
-    setPairsFound(0);
-    setSeconds(0);
-    setWon(false);
-    setInsight("");
-  };
-
-  const stars = won ? (attempts <= totalPairs + 2 ? 3 : attempts <= totalPairs + 5 ? 2 : 1) : 0;
+  }, [selected, cards, isChecking, lang]);
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-5 w-full">
       <Confetti active={won} />
 
-      {/* Stats bar */}
-      <div className="flex w-full items-center justify-between rounded-2xl bg-muted/50 px-4 py-2 text-sm font-bold">
-        <span>🃏 {t("pairsFound")}: {pairsFound}/{totalPairs}</span>
-        <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {seconds}s</span>
-        <span>🎯 {t("attempts")}: {attempts}</span>
-      </div>
+      {!won ? (
+        <div className="w-full flex flex-col items-center gap-6">
+          <div className="flex w-full items-center justify-between text-sm font-bold">
+            <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {seconds}s</span>
+            <span>🧩 {t("pairsFound") || "Pairs"}: {pairsFound}/{totalPairs}</span>
+            <span>🔢 {t("attempts") || "Attempts"}: {attempts}</span>
+          </div>
 
-      {/* Card grid */}
-      <div className="grid grid-cols-4 gap-2 sm:gap-3">
-        {cards.map(card => (
-          <motion.button
-            key={card.id}
-            onClick={() => flipCard(card.id)}
-            disabled={card.matched || card.flipped || isChecking}
-            whileHover={{ scale: card.matched || card.flipped ? 1 : 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className={`relative h-16 w-16 rounded-2xl text-3xl shadow-card transition-all sm:h-20 sm:w-20 sm:text-4xl ${
-              card.matched ? "bg-grad-green text-white shadow-glow" :
-              card.flipped ? "bg-grad-blue text-white" :
-              "bg-muted hover:bg-primary/10 cursor-pointer"
-            }`}
-          >
-            <AnimatePresence mode="wait">
-              {card.flipped || card.matched ? (
-                <motion.span
-                  key="face"
-                  initial={{ rotateY: 90 }}
-                  animate={{ rotateY: 0 }}
-                  exit={{ rotateY: 90 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute inset-0 flex items-center justify-center"
+          <div className="grid grid-cols-4 gap-3 w-full max-w-sm">
+            {cards.map(card => {
+              const isFlipped = card.flipped || card.matched;
+              return (
+                <div
+                  key={card.id}
+                  onClick={() => flipCard(card.id)}
+                  className={`aspect-square rounded-2xl flex items-center justify-center text-4xl border-2 transition-all cursor-pointer select-none ${
+                    isFlipped
+                      ? card.matched
+                        ? "border-green-500 bg-green-50 text-green-700 shadow-soft"
+                        : "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-soft"
+                      : "border-slate-200 bg-slate-100 hover:scale-105"
+                  }`}
                 >
-                  {card.emoji}
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="back"
-                  initial={{ rotateY: 90 }}
-                  animate={{ rotateY: 0 }}
-                  exit={{ rotateY: 90 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute inset-0 flex items-center justify-center text-muted-foreground"
-                >
-                  ❓
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Win overlay */}
-      {won && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full rounded-3xl bg-grad-green p-6 text-center text-white shadow-glow"
-        >
-          <Trophy className="mx-auto h-12 w-12" />
-          <div className="mt-2 font-display text-2xl font-extrabold">{t("youWon")} 🎉</div>
-          <div className="mt-1 text-lg">{"⭐".repeat(stars)}</div>
-          <div className="mt-1 text-sm opacity-90">{attempts} {t("attempts")} · {seconds} {t("timeSeconds")}</div>
-          <p className="mt-3 rounded-2xl bg-white/20 p-3 text-left text-xs leading-relaxed backdrop-blur">
-            🤖 <strong>AI Memory Analysis:</strong> {insight}
-          </p>
-          <Button onClick={restart} variant="outline" className="mt-4 rounded-full border-white/50 bg-white/20 text-white hover:bg-white/30">
-            <RotateCcw className="mr-1 h-4 w-4" /> Play Again
-          </Button>
-        </motion.div>
-      )}
-
-      {!won && (
-        <p className="text-center text-xs text-muted-foreground">
-          {t("tapToFlip")} {t("findPairs")}
-        </p>
+                  {isFlipped ? card.emoji : "❓"}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-3xl border bg-card p-6 shadow-card text-center space-y-4 w-full">
+          <span className="text-5xl">🏆🎉</span>
+          <h3 className="font-display font-extrabold text-2xl">{t("wellDone")}</h3>
+          <p className="text-sm text-muted-foreground">{insight}</p>
+        </div>
       )}
     </div>
   );

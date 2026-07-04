@@ -30,6 +30,38 @@ function getQuestionsForStory(title: string, lang: string): { q: string; a: stri
       { q: "छोटूने कोणाला मोजायला शिकवले?", a: "मित्रांना" },
     ];
   }
+  if (lang === "ta") {
+    return [
+      { q: "மரத்தில் சிட்டு என்ன எண்ணியது?", a: "மாம்பழங்களை" },
+      { q: "எல்லா பழங்களையும் கலைத்தது யார்?", a: "யானை" },
+      { q: "யானை சிட்டுக்கு என்ன கொடுத்தது?", a: "நட்சத்திரம்" },
+      { q: "சிட்டு யாருக்கு எண்ண கற்றுக்கொடுத்தது?", a: "நண்பர்களுக்கு" },
+    ];
+  }
+  if (lang === "gu") {
+    return [
+      { q: "છોટુ ઝાડ પર શું ગણતો હતો?", a: "કેરી" },
+      { q: "બધાં ફળો કોણે ભેળવી દીધાં?", a: "હાથી" },
+      { q: "હાથીએ છોટુને શું આપ્યું?", a: "સ્ટાર" },
+      { q: "છોટુએ કોને ગણતરી શીખવી?", a: "મિત્રો" },
+    ];
+  }
+  if (lang === "kn") {
+    return [
+      { q: "ಚಿಟ್ಟಿ ಮರದ ಹಣ್ಣುಗಳಲ್ಲಿ ಏನನ್ನು ಎಣಿಸುತ್ತಿತ್ತು?", a: "ಮಾವಿನ ಹಣ್ಣು" },
+      { q: "ಎಲ್ಲಾ ಹಣ್ಣುಗಳನ್ನು ಮಿಶ್ರ ಮಾಡಿದ್ದು ಯಾರು?", a: "ಆನೆ" },
+      { q: "ಆನೆ ಚಿಟ್ಟಿಗೆ ಏನು ಕೊಟ್ಟಿತು?", a: "ನಕ್ಷತ್ರ" },
+      { q: "ಚಿಟ್ಟಿ ಯಾರಿಗೆ ಎಣಿಕೆ ಕಲಿಸಿತು?", a: "ಗೆಳೆಯರಿಗೆ" },
+    ];
+  }
+  if (lang === "te") {
+    return [
+      { q: "చెట్టుపై చిట్టి ఏం లెక్కించేది?", a: "మామిడిపండ్లు" },
+      { q: "అన్ని పళ్ళను ఎవరు కలిపేశారు?", a: "ఏనుగు" },
+      { q: "ఏనుగు చిట్టికి ఏమి ఇచ్చింది?", a: "నక్షత్రం" },
+      { q: "చిట్టి ఎవరికి లెక్కించడం నేర్పింది?", a: "స్నేహితులకు" },
+    ];
+  }
   if (title.includes("Rani") || title.includes("रानी")) {
     return [
       { q: "Where did Rani love to go?", a: "forest" },
@@ -50,12 +82,18 @@ export function StoryCastle({ onComplete }: StoryCastleProps) {
   const { lang, t } = useLang();
   const { logReadingSession } = useLiveStats();
   
-  // Initialize story based on current language
-  const [story] = useState(() => generateStory(lang as LangCode));
+  // Track story state and update when language changes
+  const [story, setStory] = useState(() => generateStory(lang as LangCode));
   const [step, setStep] = useState(0);
   const [questionUnlocked, setQuestionUnlocked] = useState(false);
   const [finished, setFinished] = useState(false);
   const startTime = useMemo(() => Date.now(), []);
+
+  useEffect(() => {
+    setStory(generateStory(lang as LangCode));
+    setStep(0);
+    setFinished(false);
+  }, [lang]);
 
   const questions = useMemo(() => {
     return getQuestionsForStory(story.title, lang);
@@ -63,15 +101,14 @@ export function StoryCastle({ onComplete }: StoryCastleProps) {
 
   const currentQuestion = questions[step] || { q: "Do you like the story?", a: "yes" };
 
-  // Speak the paragraph first when page loads
+  // Speak the paragraph first when page loads or language changes
   useEffect(() => {
     if (finished) return;
     setQuestionUnlocked(false);
     
-    // Speak the paragraph text
     const paragraphText = story.paragraphs[step];
     speakText(paragraphText, lang as LangCode, () => {
-      // Auto-unlock question prompt after reading paragraph
+      // Completed reading paragraph
     });
   }, [step, story, finished, lang]);
 
@@ -99,70 +136,33 @@ export function StoryCastle({ onComplete }: StoryCastleProps) {
             ))}
           </div>
 
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="flex flex-col items-center gap-4 w-full"
-          >
-            {step === 0 && (
-              <div className="text-xl font-display font-bold text-center text-primary mb-2">
-                {story.title}
-              </div>
-            )}
-            
-            <div className="w-full rounded-3xl bg-card border shadow-card p-6 min-h-[120px] flex items-center text-center">
-              <p className="text-base md:text-lg font-medium leading-relaxed">
-                {story.paragraphs[step]}
-              </p>
-            </div>
+          <div className="rounded-3xl border bg-card p-6 shadow-card w-full text-center space-y-4">
+            <h3 className="font-display font-extrabold text-xl text-indigo-700 dark:text-indigo-400">
+              {story.title}
+            </h3>
+            <p className="text-base font-medium leading-relaxed max-w-lg mx-auto text-slate-800 dark:text-slate-200">
+              {story.paragraphs[step]}
+            </p>
+          </div>
 
-            {/* AI Voice Question evaluation */}
-            <div className="w-full rounded-3xl bg-purple-50/50 border-2 border-dashed border-brand-purple/20 p-5 mt-2 flex flex-col items-center">
-              <span className="text-xs uppercase font-extrabold text-brand-purple mb-1">Comprehension Question</span>
-              <p className="text-sm font-bold text-center text-foreground mb-3">{currentQuestion.q}</p>
-              
-              <VoiceTutorUi
-                expectedAnswer={currentQuestion.a}
-                instructionText={`${currentQuestion.q}`}
-                onCorrect={() => {
-                  setQuestionUnlocked(true);
-                }}
-                onIncorrect={() => {}}
-                onCommand={(cmd) => {
-                  if (cmd === "next" && questionUnlocked) {
-                    nextStep();
-                  }
-                }}
-                themeColor="bg-grad-purple"
-                voiceFeedbackPhrase="Correct answer! Well done! You unlocked the next page."
-              />
-            </div>
-            
-            <Button 
-              onClick={nextStep} 
-              disabled={!questionUnlocked}
-              size="lg" 
-              className="mt-4 rounded-full bg-grad-purple text-white shadow-soft font-bold px-8"
-            >
-              {step === story.paragraphs.length - 1 ? "Finish Story 🎉" : "Next Page ➡️"}
-            </Button>
-          </motion.div>
+          {/* Interactive Voice Quiz overlay to test reading check */}
+          <div className="w-full">
+            <VoiceTutorUi
+              expectedPhrase={currentQuestion.a}
+              instructionText={currentQuestion.q}
+              successText={t("correctAnswer")}
+              onSuccess={nextStep}
+            />
+          </div>
         </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full rounded-3xl bg-grad-purple p-6 text-center text-white shadow-glow"
-        >
-          <div className="text-5xl">🏰</div>
-          <div className="mt-2 font-display text-2xl font-extrabold">Story Finished!</div>
-          <div className="mt-1 text-xl">⭐⭐⭐</div>
-          <p className="mt-3 rounded-2xl bg-white/20 p-3 text-left text-xs backdrop-blur">
+        <div className="rounded-3xl border bg-card p-6 shadow-card text-center space-y-4 w-full">
+          <span className="text-5xl">🏰🎉</span>
+          <h3 className="font-display font-extrabold text-2xl">{t("wellDone")}</h3>
+          <p className="text-sm text-muted-foreground">
             🤖 Gemini AI: Excellent reading session! Exploring stories builds imagination, vocabulary, and empathy. The more we read, the more we learn!
           </p>
-        </motion.div>
+        </div>
       )}
     </div>
   );

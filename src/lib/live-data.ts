@@ -27,6 +27,7 @@ export interface LiveStats {
   timeCapsule: { id: string; date: string; title: string; durationSec: number; audioUrl: string }[];
   selectedCollectibleTheme: string;
   accessibility: { dyslexiaFont: boolean; largeUi: boolean; highContrast: boolean; speechRate: number };
+  languageCode?: string;
 }
 
 const INITIAL: LiveStats = {
@@ -70,7 +71,8 @@ const INITIAL: LiveStats = {
     largeUi: false,
     highContrast: false,
     speechRate: 1.0
-  }
+  },
+  languageCode: "en"
 };
 
 // Load persisted scores from localStorage
